@@ -7,7 +7,15 @@ import { serveFile } from "./file_server.ts";
 const { test } = Deno;
 let fileServer: Deno.Process;
 
-async function startFileServer(): Promise<void> {
+type FileServerCfg = {
+  target?: string;
+  port?: number;
+};
+
+async function startFileServer({
+  target = ".",
+  port = 4507,
+}: FileServerCfg = {}): Promise<void> {
   fileServer = Deno.run({
     cmd: [
       Deno.execPath(),
@@ -15,8 +23,10 @@ async function startFileServer(): Promise<void> {
       "--allow-read",
       "--allow-net",
       "http/file_server.ts",
-      ".",
+      target,
       "--cors",
+      "-p",
+      `${port}`,
     ],
     stdout: "piped",
     stderr: "null",
@@ -28,15 +38,22 @@ async function startFileServer(): Promise<void> {
   assert(s !== null && s.includes("server listening"));
 }
 
-function killFileServer(): void {
+async function killFileServer(): Promise<void> {
   fileServer.close();
-  fileServer.stdout?.close();
+  // Process.close() kills the file server process. However this termination
+  // happens asynchronously, and since we've just closed the process resource,
+  // we can't use `await fileServer.status()` to wait for the process to have
+  // exited. As a workaround, wait for its stdout to close instead.
+  // TODO(piscisaureus): when `Process.kill()` is stable and works on Windows,
+  // switch to calling `kill()` followed by `await fileServer.status()`.
+  await Deno.readAll(fileServer.stdout!);
+  fileServer.stdout!.close();
 }
 
-test("file_server serveFile", async (): Promise<void> => {
+test("file_server serveFile in ./", async (): Promise<void> => {
   await startFileServer();
   try {
-    const res = await fetch("http://localhost:4500/README.md");
+    const res = await fetch("http://localhost:4507/README.md");
     assert(res.headers.has("access-control-allow-origin"));
     assert(res.headers.has("access-control-allow-headers"));
     assertEquals(res.headers.get("content-type"), "text/markdown");
@@ -46,14 +63,32 @@ test("file_server serveFile", async (): Promise<void> => {
     );
     assertEquals(downloadedFile, localFile);
   } finally {
-    killFileServer();
+    await killFileServer();
+  }
+});
+
+test("file_server serveFile in ./http", async (): Promise<void> => {
+  await startFileServer({ target: "./http" });
+  try {
+    const res = await fetch("http://localhost:4507/README.md");
+    assert(res.headers.has("access-control-allow-origin"));
+    assert(res.headers.has("access-control-allow-headers"));
+    assertEquals(res.headers.get("content-type"), "text/markdown");
+    const downloadedFile = await res.text();
+    const localFile = new TextDecoder().decode(
+      await Deno.readFile("./http/README.md")
+    );
+    console.log(downloadedFile, localFile);
+    assertEquals(downloadedFile, localFile);
+  } finally {
+    await killFileServer();
   }
 });
 
 test("serveDirectory", async function (): Promise<void> {
   await startFileServer();
   try {
-    const res = await fetch("http://localhost:4500/");
+    const res = await fetch("http://localhost:4507/");
     assert(res.headers.has("access-control-allow-origin"));
     assert(res.headers.has("access-control-allow-headers"));
     const page = await res.text();
@@ -68,38 +103,38 @@ test("serveDirectory", async function (): Promise<void> {
       assert(/<td class="mode">(\s)*\(unknown mode\)(\s)*<\/td>/.test(page));
     assert(page.includes(`<a href="/README.md">README.md</a>`));
   } finally {
-    killFileServer();
+    await killFileServer();
   }
 });
 
 test("serveFallback", async function (): Promise<void> {
   await startFileServer();
   try {
-    const res = await fetch("http://localhost:4500/badfile.txt");
+    const res = await fetch("http://localhost:4507/badfile.txt");
     assert(res.headers.has("access-control-allow-origin"));
     assert(res.headers.has("access-control-allow-headers"));
     assertEquals(res.status, 404);
     const _ = await res.text();
   } finally {
-    killFileServer();
+    await killFileServer();
   }
 });
 
 test("serveWithUnorthodoxFilename", async function (): Promise<void> {
   await startFileServer();
   try {
-    let res = await fetch("http://localhost:4500/http/testdata/%");
+    let res = await fetch("http://localhost:4507/http/testdata/%");
     assert(res.headers.has("access-control-allow-origin"));
     assert(res.headers.has("access-control-allow-headers"));
     assertEquals(res.status, 200);
     let _ = await res.text();
-    res = await fetch("http://localhost:4500/http/testdata/test%20file.txt");
+    res = await fetch("http://localhost:4507/http/testdata/test%20file.txt");
     assert(res.headers.has("access-control-allow-origin"));
     assert(res.headers.has("access-control-allow-headers"));
     assertEquals(res.status, 200);
     _ = await res.text();
   } finally {
-    killFileServer();
+    await killFileServer();
   }
 });
 

@@ -122,6 +122,34 @@ class ContentTypeHandler(QuietSimpleHTTPRequestHandler):
             self.wfile.write(bytes("export const foo = 'foo';"))
             return
 
+        if "type_directives_redirect.js" in self.path:
+            self.protocol_version = "HTTP/1.1"
+            self.send_response(200, 'OK')
+            self.send_header('Content-type', 'application/javascript')
+            self.send_header(
+                'X-TypeScript-Types',
+                'http://localhost:4547/xTypeScriptTypesRedirect.d.ts')
+            self.end_headers()
+            self.wfile.write(bytes("export const foo = 'foo';"))
+            return
+
+        if "xTypeScriptTypesRedirect.d.ts" in self.path:
+            self.protocol_version = "HTTP/1.1"
+            self.send_response(200, 'OK')
+            self.send_header('Content-type', 'application/typescript')
+            self.end_headers()
+            self.wfile.write(
+                bytes("import './xTypeScriptTypesRedirected.d.ts';"))
+            return
+
+        if "xTypeScriptTypesRedirected.d.ts" in self.path:
+            self.protocol_version = "HTTP/1.1"
+            self.send_response(200, 'OK')
+            self.send_header('Content-type', 'application/typescript')
+            self.end_headers()
+            self.wfile.write(bytes("export const foo: 'foo';"))
+            return
+
         if "xTypeScriptTypes.d.ts" in self.path:
             self.protocol_version = "HTTP/1.1"
             self.send_response(200, 'OK')
@@ -335,7 +363,7 @@ def start(s):
 def spawn():
     servers = (server(), redirect_server(), another_redirect_server(),
                double_redirects_server(), https_server(),
-               absolute_redirect_server())
+               absolute_redirect_server(), inf_redirects_server())
     # In order to wait for each of the servers to be ready, we try connecting to
     # them with a tcp socket.
     for running_server in servers:

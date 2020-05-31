@@ -1,6 +1,6 @@
 # Contributing
 
-- Read the [style guide](style_guide.md).
+- Read the [style guide](./contributing/style_guide.md).
 
 - Please don't make [the benchmarks](https://deno.land/benchmarks.html) worse.
 
@@ -16,7 +16,7 @@
 ## Development
 
 Instructions on how to build from source can be found
-[here](./building-from-source).
+[here](./contributing/building_from_source.md).
 
 ## Submitting a Pull Request
 
@@ -45,6 +45,11 @@ Please list how this functionality is done in Go, Node, Rust, and Python.
 As an example, see how `Deno.rename()` was proposed and added in
 [PR #671](https://github.com/denoland/deno/pull/671).
 
+## Releases
+
+Summary of the changes from previous releases can be found
+[here](https://github.com/denoland/deno/releases).
+
 ## Documenting APIs
 
 It is important to document public APIs and we want to do that inline with the
@@ -63,3 +68,5 @@ and are denoted by a leading `/**` before terminating with a `*/`. For example:
 /** A simple JSDoc comment */
 export const FOO = "foo";
 ```
+
+Find more at https://jsdoc.app/
